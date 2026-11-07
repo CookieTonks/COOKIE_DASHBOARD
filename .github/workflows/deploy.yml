@@ -1,0 +1,84 @@
+name: Deploy FTP
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# Evita que dos subidas al mismo servidor se pisen.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, mbstring
+          tools: composer:v2
+
+      - run: composer install --no-interaction --prefer-dist
+
+      - name: Preparar configuración de prueba
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - run: php artisan test
+
+  # Corre en otra máquina limpia: el .env de prueba nunca puede llegar al servidor.
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, mbstring
+          tools: composer:v2
+
+      - name: Generar vendor para producción
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      # Solo borra en el servidor lo que esta misma acción subió antes,
+      # así que no toca el .env ni los logs y sesiones que genera la app.
+      - name: Subir por FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          protocol: ftps
+          port: 21
+          local-dir: ./
+          server-dir: /dashboard.pagos.cookiecodes.com.mx/
+          timeout: 120000
+          # vendor/ debe subirse: el servidor no corre composer.
+          # Los .gitignore de storage/ también: mantienen sus carpetas vacías.
+          exclude: |
+            .git/**
+            .github/**
+            **/node_modules/**
+            **/.env
+            **/.env.*
+            tests/**
+            docker/**
+            docker-compose.yml
+            .dockerignore
+            phpunit.xml
+            graphify-out/**
+            database/*.sqlite
+            storage/logs/*.log

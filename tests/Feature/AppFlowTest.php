@@ -10,6 +10,7 @@ use App\Models\PaymentPlan;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -85,6 +86,19 @@ class AppFlowTest extends TestCase
             ->assertSuccessful();
 
         $this->assertDatabaseHas('users', ['email' => 'nueva@test.mx']);
+    }
+
+    public function test_admin_can_be_created_from_env_without_a_prompt(): void
+    {
+        putenv('ADMIN_PASSWORD=corta');
+        $this->artisan('app:admin', ['email' => 'cron@test.mx', '--from-env' => true])->assertFailed();
+        $this->assertDatabaseMissing('users', ['email' => 'cron@test.mx']);
+
+        putenv('ADMIN_PASSWORD=una-contrasena-larga');
+        $this->artisan('app:admin', ['email' => 'cron@test.mx', '--from-env' => true])->assertSuccessful();
+        putenv('ADMIN_PASSWORD');
+
+        $this->assertTrue(Hash::check('una-contrasena-larga', User::firstWhere('email', 'cron@test.mx')->password));
     }
 
     public function test_full_flow_client_contact_plan_and_every_page_renders(): void

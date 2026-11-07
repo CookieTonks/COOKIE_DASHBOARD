@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\Hash;
 
 class CreateAdmin extends Command
 {
-    protected $signature = 'app:admin {email} {--name=Administrador}';
+    // --from-env es para hostings sin terminal: toma ADMIN_PASSWORD del .env y lo corre un cron.
+    protected $signature = 'app:admin {email} {--name=Administrador} {--from-env}';
 
     protected $description = 'Crea un usuario o cambia su contraseña (no hay registro público)';
 
@@ -22,7 +23,9 @@ class CreateAdmin extends Command
             return self::FAILURE;
         }
 
-        $password = (string) $this->secret('Contraseña (mínimo 10 caracteres)');
+        $password = $this->option('from-env')
+            ? (string) env('ADMIN_PASSWORD')
+            : (string) $this->secret('Contraseña (mínimo 10 caracteres)');
 
         if (strlen($password) < 10) {
             $this->error('La contraseña debe tener al menos 10 caracteres.');

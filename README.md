@@ -76,23 +76,27 @@ Cada `push` a `main` corre las pruebas y, si pasan, sube la app por FTP
 
 4. **`.env`:** copia `.env.hosting.example` como `.env` en la carpeta de la app y llénalo.
    El deploy nunca lo sube ni lo borra.
-5. **Base de datos y usuario**, desde la Terminal de cPanel o SSH:
-   ```bash
-   cd ~/<carpeta-del-subdominio>
-   php artisan migrate --force
-   php artisan app:admin tucorreo@ejemplo.com
-   php artisan reminders:send --dry-run
+5. **Base de datos y usuario.** Sin terminal, usa un cron temporal. Pon tu contraseña en
+   `ADMIN_PASSWORD` dentro de `.env` y agrega este cron, cada minuto:
    ```
-6. **Cron**, cada minuto. Sin él no salen recordatorios:
+   cd ~/<carpeta-del-subdominio> && php artisan migrate --force >> storage/logs/instalacion.log 2>&1 && php artisan app:admin tucorreo@ejemplo.com --from-env >> storage/logs/instalacion.log 2>&1
+   ```
+   Espera un par de minutos y revisa `storage/logs/instalacion.log`. Si dice `Usuario listo`,
+   **borra ese cron y la línea `ADMIN_PASSWORD`**, y borra también el log.
+   Con terminal o SSH, corre esos comandos a mano; sin `--from-env`, te pide la contraseña en pantalla.
+6. **Cron de recordatorios**, cada minuto. Sin él no salen:
    ```
    * * * * * cd ~/<carpeta-del-subdominio> && php artisan schedule:run >> /dev/null 2>&1
    ```
    Si el cron falla, prueba con la ruta completa de PHP que indique tu hosting.
-7. **Correo real:** cambia `MAIL_MAILER=smtp`, agrega la contraseña y corre
-   `php artisan config:clear` y `php artisan reminders:test tucorreo@ejemplo.com`.
+7. **Correo real:** cambia `MAIL_MAILER=smtp` y agrega la contraseña. Para probar sin terminal, usa
+   otro cron temporal, y bórralo en cuanto te llegue el correo:
+   ```
+   cd ~/<carpeta-del-subdominio> && php artisan reminders:test tucorreo@ejemplo.com >> storage/logs/instalacion.log 2>&1
+   ```
 
 **En cada actualización:** el `push` sube el código, pero no corre migraciones. Si agregaste
-alguna, corre `php artisan migrate --force` en el servidor.
+alguna, corre `php artisan migrate --force` en el servidor, con terminal o con un cron temporal.
 
 ## Comandos
 
