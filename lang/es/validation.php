@@ -1,5 +1,6 @@
 <?php
 
+
 return [
     'required' => 'Este campo es obligatorio.',
     'string' => 'Este campo debe ser texto.',

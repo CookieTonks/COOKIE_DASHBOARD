@@ -43,6 +43,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # historial completo: lo usa el paso de fechas
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -53,32 +55,56 @@ jobs:
       - name: Generar vendor para producción
         run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
-      # Solo borra en el servidor lo que esta misma acción subió antes,
-      # así que no toca el .env ni los logs y sesiones que genera la app.
+      # lftp compara tamaño y fecha con el servidor y solo sube lo que cambió.
+      # Para eso, cada archivo lleva la fecha de su último commit, y no la del checkout.
+      - name: Fijar fechas de los archivos
+        run: |
+          git ls-files | while IFS= read -r f; do
+            touch -d "@$(git log -1 --format=%ct -- "$f")" "$f"
+          done
+          # vendor/ solo cambia junto con composer.lock...
+          find vendor -exec touch -d "@$(git log -1 --format=%ct -- composer.lock)" {} +
+          # ...salvo el autoload, que también lista las clases de app/.
+          touch -d "@$(git log -1 --format=%ct)" vendor/composer/*
+
+      - name: Instalar lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      # Si el hosting corta la conexión, lftp reconecta y sigue donde iba.
+      # No usa --delete: nunca borra nada del servidor (.env, logs, sesiones).
+      # La cuenta FTP entra directo a la carpeta de la app (la que contiene public/,
+      # nunca public/ misma), por eso se sube a su raíz.
+      # vendor/ debe subirse: el servidor no corre composer.
+      # Los .gitignore de storage/ también: mantienen sus carpetas vacías.
       - name: Subir por FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASS }}
-          protocol: ftps
-          port: 21
-          local-dir: ./
-          server-dir: /dashboard.pagos.cookiecodes.com.mx/
-          timeout: 120000
-          # vendor/ debe subirse: el servidor no corre composer.
-          # Los .gitignore de storage/ también: mantienen sus carpetas vacías.
-          exclude: |
-            .git/**
-            .github/**
-            **/node_modules/**
-            **/.env
-            **/.env.*
-            tests/**
-            docker/**
-            docker-compose.yml
-            .dockerignore
-            phpunit.xml
-            graphify-out/**
-            database/*.sqlite
-            storage/logs/*.log
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          LFTP_PASSWORD: ${{ secrets.FTP_PASS }}
+        run: |
+          lftp --env-password -u "$FTP_USER" "$FTP_SERVER" <<'LFTP'
+          set cmd:fail-exit true
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set net:timeout 30
+          set net:max-retries 30
+          set net:persist-retries 30
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-max 60
+          mirror --reverse --verbose --no-perms --parallel=1 \
+            -x '^\.git/' \
+            -x '^\.github/' \
+            -x 'node_modules/' \
+            -x '(^|/)\.env($|\.)' \
+            -x '^tests/' \
+            -x '^docker/' \
+            -x '^docker-compose\.yml$' \
+            -x '^\.dockerignore$' \
+            -x '^phpunit\.xml$' \
+            -x '^\.phpunit\.result\.cache$' \
+            -x '^graphify-out/' \
+            -x '^database/.*\.sqlite$' \
+            -x '^storage/logs/.*\.log$' \
+            ./ ./
+          bye
+          LFTP

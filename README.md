@@ -63,7 +63,8 @@ Cada `push` a `main` corre las pruebas y, si pasan, sube la app por FTP
 
 **Una sola vez, antes del primer `push`:**
 
-1. **Carpeta destino:** en `deploy.yml`, `server-dir` debe ser la carpeta de tu subdominio.
+1. **Cuenta FTP:** crea una solo para este proyecto, con directorio en la carpeta de la app (la que
+   contiene `public/`, nunca `public/` misma). `deploy.yml` sube a la raíz de esa cuenta.
 2. **Secretos del repositorio:** `FTP_SERVER`, `FTP_USER` y `FTP_PASS`, en
    *Settings → Secrets and variables → Actions*.
 3. **cPanel:**
