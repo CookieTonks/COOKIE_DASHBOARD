@@ -2,7 +2,6 @@
 
 @section('title', 'Entrar')
 
-
 @section('body')
     <div class="login-wrap">
         <form method="post" action="{{ route('login') }}" class="card login-card">
