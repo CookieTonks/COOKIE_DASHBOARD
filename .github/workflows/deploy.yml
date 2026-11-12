@@ -86,6 +86,7 @@ jobs:
           set cmd:fail-exit true
           set ftp:ssl-force true
           set ftp:ssl-protect-data true
+          set ssl:verify-certificate false
           set net:timeout 30
           set net:max-retries 30
           set net:persist-retries 30
