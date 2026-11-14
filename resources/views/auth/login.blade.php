@@ -11,13 +11,16 @@
 
             <div class="field">
                 <label for="email">Correo</label>
-                <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username">
-                @error('email') <div class="error">{{ $message }}</div> @enderror
+                <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
+                    autocomplete="username">
+                @error('email')
+                <div class="error">{{ $message }}</div> @enderror
             </div>
             <div class="field">
                 <label for="password">Contraseña</label>
                 <input id="password" type="password" name="password" required autocomplete="current-password">
-                @error('password') <div class="error">{{ $message }}</div> @enderror
+                @error('password')
+                <div class="error">{{ $message }}</div> @enderror
             </div>
             <div class="field">
                 <label class="check"><input type="checkbox" name="remember"> Mantener mi sesión</label>
